@@ -4,7 +4,8 @@ From your Cloud Foundry environment extract the configuration needed for this ap
 
 ```cf env cf-sample-app-nodejs```
 
-Save that information (a JSON file) into the `cf-vcap-application.json` file to be used later.
+Save that information (a JSON file) into the [`cf-vcap-application.json`](./cloudfoundry/cd-vcap-application.json) file
+to be used later.
 
 ## Deploying in OpenShift
 
