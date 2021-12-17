@@ -1,0 +1,103 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  labels:
+    app.kubernetes.io/instance: cf-sample-app-nodejs
+    app.kubernetes.io/name: cf-sample-app-nodejs
+    pipeline.openshift.io/runtime: nodejs
+    pipeline.openshift.io/runtime-version: 14-ubi8
+    pipeline.openshift.io/type: kubernetes
+  name: cf-sample-app-nodejs
+spec:
+  params:
+    - name: APP_NAME
+      type: string
+      default: cf-sample-app-nodejs
+    - name: GIT_REPO
+      type: string
+      default: 'https://github.com/app-modernization-migration/cf-sample-app-nodejs.git'
+    - name: GIT_REVISION
+      type: string
+      default: master
+    - name: IMAGE_NAME
+      type: string
+      default: >-
+        image-registry.openshift-image-registry.svc:5000/cf2ocp-sample-app-nodejs/cf-sample-app-nodejs
+    - name: PATH_CONTEXT
+      type: string
+      default: .
+    - name: VERSION
+      type: string
+      default: 14-ubi8
+    - name: PORT
+      type: string
+      default: '8080'
+  tasks:
+    - name: fetch-repository
+      params:
+        - name: url
+          value: $(params.GIT_REPO)
+        - name: revision
+          value: $(params.GIT_REVISION)
+        - name: subdirectory
+          value: ''
+        - name: deleteExisting
+          value: 'true'
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: workspace
+    - name: build
+      params:
+        - name: IMAGE
+          value: $(params.IMAGE_NAME)
+        - name: TLSVERIFY
+          value: 'false'
+        - name: PATH_CONTEXT
+          value: $(params.PATH_CONTEXT)
+        - name: VERSION
+          value: $(params.VERSION)
+      runAfter:
+        - fetch-repository
+      taskRef:
+        kind: ClusterTask
+        name: s2i-nodejs
+      workspaces:
+        - name: source
+          workspace: workspace
+    - name: set-deploy-env
+      params:
+        - name: SCRIPT
+          value: |
+            echo "---------------- Applying Deployment ---------------- "
+            oc apply -f openshift/
+            echo "---------------- Patching Deployment  ---------------- "
+            oc patch deployment/$(params.APP_NAME) -p '{"spec":{"template":{"spec":{"containers":[{"name":"$(params.APP_NAME)","env":[{"name":"VCAP_APPLICATION","valueFrom":{"configMapKeyRef":{"name":"$(params.APP_NAME)-cm","key":"VCAP_APPLICATION"}}}]}]}}}}'
+            oc patch deployment/$(params.APP_NAME) -p '{"spec":{"template":{"spec":{"containers":[{"name":"$(params.APP_NAME)","env":[{"name":"CF_INSTANCE_INDEX","valueFrom":{"configMapKeyRef":{"name":"$(params.APP_NAME)-cm","key":"CF_INSTANCE_INDEX"}}}]}]}}}}'
+            echo "---------------- Setting Deployment Env ---------------- "
+            oc set env deployment/$(params.APP_NAME) PORT=$(params.PORT)
+      runAfter:
+        - build
+      taskRef:
+        kind: ClusterTask
+        name: openshift-client
+      workspaces:
+        - name: manifest-dir
+          workspace: workspace        
+    - name: deploy
+      params:
+        - name: SCRIPT
+          value: |
+            echo "---------------- Rolling Deployment ---------------- "
+            oc rollout status deployment/$(params.APP_NAME)
+            echo "---------------- Verifying Deployment ---------------- "
+            oc wait --for=condition=available --timeout=600s deployment/$(params.APP_NAME)
+      runAfter:
+        - set-deploy-env
+      taskRef:
+        kind: ClusterTask
+        name: openshift-client        
+  workspaces:
+    - name: workspace
