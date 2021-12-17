@@ -22,9 +22,9 @@ spec:
         deployment: cf-sample-app-nodejs
     spec:
       containers:
+      - name: cf-sample-app-nodejs
         image: image-registry.openshift-image-registry.svc:5000/cf2ocp-sample-app-nodejs/cf-sample-app-nodejs:latest
-        imagePullPolicy: Always
-        name: cf-sample-app-nodejs
+        imagePullPolicy: Always        
         ports:
         - containerPort: 8080
           protocol: TCP
