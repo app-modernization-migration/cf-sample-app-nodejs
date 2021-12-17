@@ -22,7 +22,7 @@ spec:
     - name: IMAGE_NAME
       type: string
       default: >-
-        image-registry.openshift-image-registry.svc:5000/cf2ocp-sample-app-nodejs/cf-sample-app-nodejs
+        image-registry.openshift-image-registry.svc:5000/cf2ocp-sample-app-nodejs/cf-sample-app-nodejs:latest
     - name: PATH_CONTEXT
       type: string
       default: .
